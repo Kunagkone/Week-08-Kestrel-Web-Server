@@ -181,5 +181,22 @@
 
 ## คำถามท้ายการทดลอง (Review Questions)
 1. ในสถาปัตยกรรมของ Kestrel ตัวแปร `builder` ทำหน้าที่อะไร และตัวแปร `app` ทำหน้าที่อะไร
-2. เปรียบเทียบความสะดวกระหว่างการสร้าง Web Server บน .NET Minimal API กับการรันผ่าน LAMP Stack (Apache + PHP) ว่ามีข้อดีข้อเสียต่างกันอย่างไรในมุมมองของงาน IoT Gateway
+
+builder (WebApplicationBuilder): ทำหน้าที่เตรียมและกำหนดคอนฟิก (Configuration) ต่างๆ ของแอปพลิเคชันก่อนสร้างเซิร์ฟเวอร์ เช่น การตั้งค่า Logging, การกำหนดสภาพแวดล้อม (Environment) และการลงทะเบียน Services หรือ Dependency Injection
+
+app (WebApplication): ทำหน้าที่เป็นตัวเว็บเซิร์ฟเวอร์จริงในการรับ-ส่งข้อมูล จัดการ Request Pipeline, กำหนดเส้นทาง URL (Route Mapping เช่น app.MapGet) และควบคุมการเริ่มต้นทำงานผ่านคำสั่ง app.Run()
+
+2. เปรียบเทียบความสะดวกระหว่างการสร้าง Web Server บน .NET Minimal API กับการรันผ่าน 
+LAMP Stack (Apache + PHP) ว่ามีข้อดีข้อเสียต่างกันอย่างไรในมุมมองของงาน IoT Gateway
+
+ในการพัฒนาระบบ **IoT Edge Gateway** ซึ่งมักรันบนอุปกรณ์ขนาดเล็กที่มีทรัพยากรจำกัด (เช่น Raspberry Pi หรือ Industrial PC) การเปรียบเทียบระหว่างทั้งสองสถาปัตยกรรมเป็นดังนี้:
+
+| ประเด็นเปรียบเทียบ | .NET Minimal API (Kestrel)[cite: 1] | LAMP Stack (Apache + PHP)[cite: 1] |
+| :--- | :--- | :--- |
+| **สถาปัตยกรรม (Architecture)** | มี Kestrel Web Server ฝังมาในตัวโปรแกรม รันเป็นไฟล์สั่งประมวลผลเดียว (.exe หรือ Binary)[cite: 1] | ต้องติดตั้งและตั้งค่าโปรแกรมแยกกันหลายตัว (Apache, PHP Engine, Database)[cite: 1] |
+| **การใช้ทรัพยากร (Resources)** | ใช้ RAM และ CPU ต่ำ เหมาะกับอุปกรณ์ขอบ (Edge Device) ที่มีทรัพยากรจำกัด | ใช้ทรัพยากรระบบสูงกว่า เนื่องจากต้องรัน Service ของ Apache และ PHP ค้างไว้ตลอดเวลา |
+| **ประสิทธิภาพ (Performance)** | ให้ผลลัพธ์การตอบสนองที่รวดเร็ว (High Performance)[cite: 1] รับส่งข้อมูลแบบ Real-time ได้ดี | ประสิทธิภาพปานกลาง มี Overhead จากการแปลภาษาและการประมวลผลผ่าน Apache |
+| **การจัดส่งระบบ (Deployment)** | ติดตั้งง่าย เพียงก๊อปปี้ไฟล์โปรแกรมไปวางและสั่งรันได้ทันทีโดยไม่ต้องตั้งค่า Web Server เพิ่ม[cite: 1] | มีความยุ่งยากในการตั้งค่าคอนฟิก Apache VirtualHost, PHP-FPM และ Permissions ต่างๆ |
+| **การจัดการข้อมูล JSON** | แปลง C# Object เป็น JSON และแปะ Header ให้โดยอัตโนมัติ (Built-in Serializer)[cite: 1] | ต้องเขียนโค้ดแปลงข้อมูลด้วยคำสั่ง `json_encode()` หรือ `json_decode()` เพิ่มเติม[cite: 1] |
+
 3. นักศึกษาคิดว่าการเพิ่ม `/api/` เข้าไปใน route นั้นมีประโยชน์อย่างไรบ้าง ถ้าไม่ใส่จะเกิดปัญหาอะไรบ้าง
