@@ -175,6 +175,7 @@
    - `timestamp`= เวลาปัจจุบันของเซิร์ฟเวอร์ (`DateTime.Now.ToString(...)`)
 
  **หลักฐานการส่งงาน** บันทึกภาพหน้าจอเบราว์เซอร์ที่เปิดแสดงผล JSON จาก `/api/student` พร้อมโค้ดใน VS Code ลงในรายงานผลการทดลอง
+<img width="1917" height="960" alt="image" src="https://github.com/user-attachments/assets/0eab49a8-f15b-4b66-8675-192d0daa0ccf" />
 
 ---
 
