@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ESP32 IoT Speedometer Dashboard</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background-color: #070d19;
+            color: #cbd5e1;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 30px 20px;
+        }
+
+        .dashboard-wrapper {
+            width: 100%;
+            max-width: 900px;
+        }
+
+        .top-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+        }
+        .header-sub {
+            font-size: 0.7rem;
+            letter-spacing: 2px;
+            color: #38bdf8;
+            font-weight: 700;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+        }
+        .header-title {
+            font-size: 1.8rem;
+            color: #ffffff;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+        }
+        .status-pill {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.75rem;
+            color: #94a3b8;
+        }
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: #22c55e;
+            box-shadow: 0 0 10px #22c55e;
+        }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 1.3fr 0.9fr;
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+
+        .card {
+            background-color: #0d1527;
+            border: 1px solid #1e293b;
+            border-radius: 12px;
+            padding: 20px;
+            position: relative;
+        }
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        .card-title {
+            font-size: 0.75rem;
+            font-weight: 700;
+            letter-spacing: 1px;
+            color: #94a3b8;
+            text-transform: uppercase;
+        }
+        .badge-alert {
+            font-size: 0.65rem;
+            font-weight: 700;
+            padding: 2px 8px;
+            border-radius: 4px;
+            background: rgba(34, 197, 94, 0.15);
+            color: #4ade80;
+            border: 1px solid rgba(74, 222, 128, 0.3);
+        }
+
+        .gauge-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .gauge-svg {
+            width: 100%;
+            max-width: 320px;
+        }
+        #needle {
+            transform-origin: 150px 150px;
+            transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .vumeter-box {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #172239;
+        }
+        .vumeter-header {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.65rem;
+            color: #64748b;
+            font-weight: 600;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+        }
+        .vumeter-svg {
+            width: 100%;
+            height: 25px;
+        }
+        .led {
+            transition: opacity 0.1s ease;
+        }
+
+        .stats-sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        .stat-box {
+            background-color: #0d1527;
+            border: 1px solid #1e293b;
+            border-radius: 12px;
+            padding: 16px 20px;
+            flex: 1;
+        }
+        .stat-label {
+            font-size: 0.65rem;
+            font-weight: 700;
+            color: #64748b;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 800;
+            color: #38bdf8;
+            margin-top: 4px;
+        }
+        .stat-unit {
+            font-size: 0.7rem;
+            color: #475569;
+            margin-top: 2px;
+        }
+        .source-value {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #f1f5f9;
+            margin-top: 6px;
+            word-break: break-all;
+        }
+        .timestamp-text {
+            font-size: 0.65rem;
+            color: #475569;
+            margin-top: 10px;
+            text-align: right;
+        }
+
+        .bottom-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        .seven-seg-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 10px 0;
+        }
+        .seg {
+            fill: #142036;
+            transition: opacity 0.08s ease, fill 0.08s ease;
+        }
+        .seg.active {
+            fill: #00ffcc;
+            filter: drop-shadow(0 0 6px #00ffcc);
+        }
+
+        .tank-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 5px 0;
+        }
+        #water-fill {
+            transition: y 0.15s ease-out, height 0.15s ease-out;
+        }
+    </style>
+</head>
+<body>
+
+<div class="dashboard-wrapper">
+    <div class="top-header">
+        <div>
+            <div class="header-sub">ESP32 &bull; KESTREL &bull; LIVE TELEMETRY</div>
+            <div class="header-title">IoT Edge Speedometer</div>
+        </div>
+        <div class="status-pill">
+            <span class="status-dot"></span>
+            <span id="conn-text">เชื่อมต่อ ESP32 แล้ว</span>
+        </div>
+    </div>
+
+    <div class="dashboard-grid">
+        <div class="card">
+            <div class="card-header">
+                <span class="card-title">Sensor Output</span>
+                <span class="badge-alert" id="alert-badge">NORMAL</span>
+            </div>
+            <div class="gauge-container">
+                <svg class="gauge-svg" viewBox="0 0 300 200">
+                    <path d="M 40 150 A 110 110 0 0 1 260 150" fill="none" stroke="#162238" stroke-width="16" stroke-linecap="round"/>
+                    <path d="M 40 150 A 110 110 0 0 1 150 40" fill="none" stroke="#22c55e" stroke-width="6" stroke-linecap="round"/>
+                    <path d="M 150 40 A 110 110 0 0 1 215 65" fill="none" stroke="#eab308" stroke-width="6"/>
+                    <path d="M 215 65 A 110 110 0 0 1 260 150" fill="none" stroke="#ef4444" stroke-width="6" stroke-linecap="round"/>
+
+                    <text x="35" y="175" fill="#64748b" font-size="12" font-weight="600" text-anchor="middle">0</text>
+                    <text x="150" y="25" fill="#64748b" font-size="12" font-weight="600" text-anchor="middle">50</text>
+                    <text x="265" y="175" fill="#64748b" font-size="12" font-weight="600" text-anchor="middle">100</text>
+
+                    <text id="disp-percent" x="150" y="125" fill="#ffffff" font-size="34" font-weight="800" text-anchor="middle">0.0%</text>
+                    <text x="150" y="145" fill="#64748b" font-size="10" font-weight="700" letter-spacing="1" text-anchor="middle">PERCENT</text>
+
+                    <g id="needle" style="transform: rotate(-90deg);">
+                        <polygon points="147,150 153,150 151,48 149,48" fill="#f43f5e" filter="drop-shadow(0 0 6px #f43f5e)"/>
+                        <circle cx="150" cy="150" r="10" fill="#ffffff"/>
+                        <circle cx="150" cy="150" r="5" fill="#f43f5e"/>
+                    </g>
+                </svg>
+            </div>
+
+            <div class="vumeter-box">
+                <div class="vumeter-header">
+                    <span>VU Meter</span>
+                    <span>0 — 100%</span>
+                </div>
+                <svg class="vumeter-svg" viewBox="0 0 250 25" id="vumeter">
+                    <rect class="led" x="5" y="2" width="18" height="20" rx="3" fill="#22c55e" opacity="0.15"/>
+                    <rect class="led" x="28" y="2" width="18" height="20" rx="3" fill="#22c55e" opacity="0.15"/>
+                    <rect class="led" x="51" y="2" width="18" height="20" rx="3" fill="#22c55e" opacity="0.15"/>
+                    <rect class="led" x="74" y="2" width="18" height="20" rx="3" fill="#22c55e" opacity="0.15"/>
+                    <rect class="led" x="97" y="2" width="18" height="20" rx="3" fill="#22c55e" opacity="0.15"/>
+                    <rect class="led" x="120" y="2" width="18" height="20" rx="3" fill="#22c55e" opacity="0.15"/>
+                    <rect class="led" x="143" y="2" width="18" height="20" rx="3" fill="#eab308" opacity="0.15"/>
+                    <rect class="led" x="166" y="2" width="18" height="20" rx="3" fill="#eab308" opacity="0.15"/>
+                    <rect class="led" x="189" y="2" width="18" height="20" rx="3" fill="#ef4444" opacity="0.15"/>
+                    <rect class="led" x="212" y="2" width="18" height="20" rx="3" fill="#ef4444" opacity="0.15"/>
+                </svg>
+            </div>
+        </div>
+
+        <div class="stats-sidebar">
+            <div class="stat-box">
+                <div class="stat-label">ADC 12-Bit Raw</div>
+                <div class="stat-value" id="disp-raw">0</div>
+                <div class="stat-unit">ช่วง 0–4095</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Sensor Voltage</div>
+                <div class="stat-value" id="disp-volt">0.00</div>
+                <div class="stat-unit">โวลต์</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Data Source</div>
+                <div class="source-value" id="disp-source">Connecting...</div>
+                <div class="timestamp-text" id="disp-time">อัปเดตล่าสุด: -</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="bottom-grid">
+        <div class="card">
+            <div class="card-header">
+                <span class="card-title">7-Segment Display</span>
+                <span style="font-size: 0.65rem; color: #64748b;">00–99%</span>
+            </div>
+            <div class="seven-seg-container">
+                <svg width="220" height="110" viewBox="0 0 230 130">
+                    <rect x="5" y="5" width="220" height="120" rx="10" fill="#090e1a" stroke="#172239" stroke-width="1.5"/>
+                    
+                    <g id="seg-digit1" transform="translate(25, 12)">
+                        <polygon class="seg a" points="14,12 19,7 41,7 46,12 41,17 19,17"/>
+                        <polygon class="seg b" points="48,14 53,19 53,41 48,46 43,41 43,19"/>
+                        <polygon class="seg c" points="48,54 53,59 53,81 48,86 43,81 43,59"/>
+                        <polygon class="seg d" points="14,88 19,83 41,83 46,88 41,93 19,93"/>
+                        <polygon class="seg e" points="12,54 17,59 17,81 12,86 7,81 7,59"/>
+                        <polygon class="seg f" points="12,14 17,19 17,41 12,46 7,41 7,19"/>
+                        <polygon class="seg g" points="14,50 19,45 41,45 46,50 41,55 19,55"/>
+                    </g>
+
+                    <g id="seg-digit2" transform="translate(100, 12)">
+                        <polygon class="seg a" points="14,12 19,7 41,7 46,12 41,17 19,17"/>
+                        <polygon class="seg b" points="48,14 53,19 53,41 48,46 43,41 43,19"/>
+                        <polygon class="seg c" points="48,54 53,59 53,81 48,86 43,81 43,59"/>
+                        <polygon class="seg d" points="14,88 19,83 41,83 46,88 41,93 19,93"/>
+                        <polygon class="seg e" points="12,54 17,59 17,81 12,86 7,81 7,59"/>
+                        <polygon class="seg f" points="12,14 17,19 17,41 12,46 7,41 7,19"/>
+                        <polygon class="seg g" points="14,50 19,45 41,45 46,50 41,55 19,55"/>
+                    </g>
+
+                    <text x="178" y="86" fill="#00ffcc" font-family="'Courier New', monospace" font-size="28" font-weight="bold" opacity="0.85">%</text>
+                    <text x="115" y="112" fill="#475569" font-size="8" font-weight="700" letter-spacing="1" text-anchor="middle">DIGITAL SENSOR LEVEL</text>
+                </svg>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <span class="card-title">Tank Level</span>
+                <span style="font-size: 0.65rem; color: #64748b;">0–100%</span>
+            </div>
+            <div class="tank-container">
+                <svg width="180" height="130" viewBox="0 0 200 150">
+                    <defs>
+                        <linearGradient id="water-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+                            <stop offset="0%" stop-color="#00f2fe" stop-opacity="0.95"/>
+                            <stop offset="100%" stop-color="#2563eb" stop-opacity="0.8"/>
+                        </linearGradient>
+                        <clipPath id="tank-shape">
+                            <rect x="35" y="10" width="60" height="105" rx="14"/>
+                        </clipPath>
+                    </defs>
+
+                    <rect x="35" y="10" width="60" height="105" rx="14" fill="#090e1a" stroke="#172239" stroke-width="1.5"/>
+
+                    <g clip-path="url(#tank-shape)">
+                        <rect id="water-fill" x="35" y="115" width="60" height="0" fill="url(#water-grad)" filter="drop-shadow(0 0 6px #00f2fe)"/>
+                    </g>
+
+                    <rect x="35" y="10" width="60" height="105" rx="14" fill="none" stroke="#38bdf8" stroke-width="2" opacity="0.5"/>
+                    <rect x="40" y="16" width="4" height="90" rx="2" fill="#ffffff" opacity="0.15"/>
+
+                    <line x1="105" y1="12" x2="112" y2="12" stroke="#64748b" stroke-width="1.5"/>
+                    <text x="118" y="15" fill="#64748b" font-size="9">— 100%</text>
+
+                    <line x1="105" y1="38" x2="109" y2="38" stroke="#475569" stroke-width="1"/>
+                    <text x="118" y="41" fill="#475569" font-size="8">— 75%</text>
+
+                    <line x1="105" y1="63" x2="112" y2="63" stroke="#64748b" stroke-width="1.5"/>
+                    <text x="118" y="66" fill="#64748b" font-size="9">— 50%</text>
+
+                    <line x1="105" y1="89" x2="109" y2="89" stroke="#475569" stroke-width="1"/>
+                    <text x="118" y="92" fill="#475569" font-size="8">— 25%</text>
+
+                    <line x1="105" y1="114" x2="112" y2="114" stroke="#64748b" stroke-width="1.5"/>
+                    <text x="118" y="117" fill="#64748b" font-size="9">— 0%</text>
+
+                    <text id="tank-val" x="65" y="132" text-anchor="middle" fill="#38bdf8" font-size="14" font-weight="bold">0.0%</text>
+                    <text x="65" y="144" text-anchor="middle" fill="#475569" font-size="7" font-weight="700" letter-spacing="1">TANK LEVEL</text>
+                </svg>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function percentToAngle(pct) {
+        return (pct / 100.0) * 180.0 - 90.0;
+    }
+
+    function updateVuMeter(percentage) {
+        const leds = document.querySelectorAll('#vumeter .led');
+        const activeCount = Math.round((percentage / 100.0) * leds.length);
+        leds.forEach((led, index) => {
+            if (index < activeCount) {
+                led.style.opacity = '1.0';
+                const color = led.getAttribute('fill');
+                led.style.filter = `drop-shadow(0 0 6px ${color})`;
+            } else {
+                led.style.opacity = '0.15';
+                led.style.filter = 'none';
+            }
+        });
+    }
+
+    const SEGMENT_MAP = {
+        0: [1, 1, 1, 1, 1, 1, 0],
+        1: [0, 1, 1, 0, 0, 0, 0],
+        2: [1, 1, 0, 1, 1, 0, 1],
+        3: [1, 1, 1, 1, 0, 0, 1],
+        4: [0, 1, 1, 0, 0, 1, 1],
+        5: [1, 0, 1, 1, 0, 1, 1],
+        6: [1, 0, 1, 1, 1, 1, 1],
+        7: [1, 1, 1, 0, 0, 0, 0],
+        8: [1, 1, 1, 1, 1, 1, 1],
+        9: [1, 1, 1, 1, 0, 1, 1]
+    };
+    const SEG_NAMES = ['a', 'b', 'c', 'd', 'e', 'f', 'g'];
+
+    function setDigit(digitGroupId, num) {
+        const group = document.getElementById(digitGroupId);
+        if (!group) return;
+        const pattern = SEGMENT_MAP[num] || [0, 0, 0, 0, 0, 0, 0];
+        SEG_NAMES.forEach((segName, index) => {
+            const segElement = group.querySelector(`.${segName}`);
+            if (segElement) {
+                if (pattern[index] === 1) {
+                    segElement.classList.add('active');
+                } else {
+                    segElement.classList.remove('active');
+                }
+            }
+        });
+    }
+
+    function update7Segment(percentage) {
+        const val = Math.min(99, Math.max(0, Math.round(percentage)));
+        setDigit('seg-digit1', Math.floor(val / 10));
+        setDigit('seg-digit2', val % 10);
+    }
+
+    function updateTankLevel(percentage) {
+        const maxHeight = 105;
+        const tankBottomY = 115;
+        const clampedPct = Math.min(100, Math.max(0, percentage));
+        const fillHeight = (clampedPct / 100.0) * maxHeight;
+        const fillY = tankBottomY - fillHeight;
+
+        const water = document.getElementById('water-fill');
+        if (water) {
+            water.setAttribute('height', fillHeight);
+            water.setAttribute('y', fillY);
+        }
+        const tankText = document.getElementById('tank-val');
+        if (tankText) {
+            tankText.textContent = clampedPct.toFixed(1) + '%';
+        }
+    }
+
+    async function pollTelemetry() {
+        try {
+            const res = await fetch('/api/telemetry');
+            if (!res.ok) return;
+            const data = await res.json();
+
+            document.getElementById('disp-percent').textContent = data.percentage.toFixed(1) + '%';
+            document.getElementById('disp-raw').textContent = data.rawValue;
+            document.getElementById('disp-volt').textContent = data.voltage.toFixed(2);
+            document.getElementById('disp-source').textContent = data.dataSource;
+            document.getElementById('disp-time').textContent = 'อัปเดตล่าสุด: ' + data.timestamp;
+
+            
+            const alertBadge = document.getElementById('alert-badge');
+            if (data.alertLevel) {
+                alertBadge.textContent = data.alertLevel;
+                if (data.alertLevel.includes('DANGER')) {
+                    alertBadge.style.color = '#ef4444';
+                    alertBadge.style.borderColor = 'rgba(239, 68, 68, 0.4)';
+                    alertBadge.style.background = 'rgba(239, 68, 68, 0.15)';
+                } else if (data.alertLevel.includes('WARNING')) {
+                    alertBadge.style.color = '#facc15';
+                    alertBadge.style.borderColor = 'rgba(250, 204, 21, 0.4)';
+                    alertBadge.style.background = 'rgba(250, 204, 21, 0.15)';
+                } else {
+                    alertBadge.style.color = '#4ade80';
+                    alertBadge.style.borderColor = 'rgba(74, 222, 128, 0.3)';
+                    alertBadge.style.background = 'rgba(34, 197, 94, 0.15)';
+                }
+            }
+
+            const angle = percentToAngle(data.percentage);
+            document.getElementById('needle').style.transform = `rotate(${angle}deg)`;
+
+            updateVuMeter(data.percentage);
+            update7Segment(data.percentage);
+            updateTankLevel(data.percentage);
+
+        } catch (err) {
+            console.error('Polling error:', err);
+        }
+    }
+
+    setInterval(pollTelemetry, 150);
+</script>
+
+</body>
+</html>
