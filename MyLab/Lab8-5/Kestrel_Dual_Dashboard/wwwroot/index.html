@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dual-Channel IoT Command Center - 67030110</title>
+    <style>
+        :root {
+            --bg: #070d19;
+            --card: #0d1527;
+            --border: #1e293b;
+            --cyan: #00f2fe;
+            --green: #00ffcc;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background: radial-gradient(circle at 50% 15%, #132238 0%, var(--bg) 100%);
+            color: #f8fafc;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            padding: 30px 16px;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 25px;
+        }
+        .header h1 {
+            font-size: 1.8rem;
+            color: #ffffff;
+            font-weight: 800;
+        }
+        .header p {
+            color: #94a3b8;
+            font-size: 0.85rem;
+            margin-top: 4px;
+        }
+        .student-badge {
+            display: inline-block;
+            margin-top: 8px;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            background: rgba(0, 242, 254, 0.1);
+            color: var(--cyan);
+            border: 1px solid rgba(0, 242, 254, 0.3);
+        }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+            gap: 20px;
+            width: 100%;
+            max-width: 850px;
+            margin-bottom: 20px;
+        }
+        .widget-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 24px 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+        }
+        .card-tag {
+            font-size: 0.7rem;
+            font-weight: 700;
+            letter-spacing: 1.5px;
+            color: #38bdf8;
+            text-transform: uppercase;
+            margin-bottom: 6px;
+        }
+        .widget-card h3 {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: #ffffff;
+            margin-bottom: 15px;
+        }
+
+        .seg {
+            fill: #142036;
+            transition: opacity 0.08s ease, fill 0.08s ease;
+        }
+        .seg.active {
+            fill: var(--green);
+            opacity: 1;
+            filter: drop-shadow(0 0 6px var(--green));
+        }
+
+        #water-fill {
+            transition: y 0.15s ease-out, height 0.15s ease-out;
+        }
+
+        .stat-details {
+            margin-top: 15px;
+            display: flex;
+            gap: 20px;
+            text-align: center;
+        }
+        .stat-item-lbl {
+            font-size: 0.65rem;
+            color: #64748b;
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+        .stat-item-val {
+            font-size: 1.1rem;
+            font-weight: bold;
+            color: #38bdf8;
+            margin-top: 2px;
+        }
+
+        .status-footer {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 12px 24px;
+            width: 100%;
+            max-width: 850px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.75rem;
+            color: #94a3b8;
+        }
+        .live-dot {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #22c55e;
+            box-shadow: 0 0 8px #22c55e;
+            margin-right: 6px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>🎛️ Dual-Channel IoT Command Center</h1>
+        <p>ESP32 Hardware Stream &bull; Kestrel Edge Web Server</p>
+        <div class="student-badge">ID: 67030110 &bull; Gauges: (Left: 3 - 7-Segment, Right: 4 - Liquid Tank)</div>
+    </div>
+
+    <div class="dashboard-grid">
+        <div class="widget-card">
+            <span class="card-tag">Channel A &bull; Hardware Potentiometer</span>
+            <h3>Retro 7-Segment Display</h3>
+            <div style="padding: 10px 0;">
+                <svg width="240" height="130" viewBox="0 0 230 130">
+                    <rect x="5" y="5" width="220" height="120" rx="10" fill="#090e1a" stroke="#172239" stroke-width="1.5"/>
+                    <g id="seg-digit1" transform="translate(25, 12)">
+                        <polygon class="seg a" points="14,12 19,7 41,7 46,12 41,17 19,17"/>
+                        <polygon class="seg b" points="48,14 53,19 53,41 48,46 43,41 43,19"/>
+                        <polygon class="seg c" points="48,54 53,59 53,81 48,86 43,81 43,59"/>
+                        <polygon class="seg d" points="14,88 19,83 41,83 46,88 41,93 19,93"/>
+                        <polygon class="seg e" points="12,54 17,59 17,81 12,86 7,81 7,59"/>
+                        <polygon class="seg f" points="12,14 17,19 17,41 12,46 7,41 7,19"/>
+                        <polygon class="seg g" points="14,50 19,45 41,45 46,50 41,55 19,55"/>
+                    </g>
+                    <g id="seg-digit2" transform="translate(100, 12)">
+                        <polygon class="seg a" points="14,12 19,7 41,7 46,12 41,17 19,17"/>
+                        <polygon class="seg b" points="48,14 53,19 53,41 48,46 43,41 43,19"/>
+                        <polygon class="seg c" points="48,54 53,59 53,81 48,86 43,81 43,59"/>
+                        <polygon class="seg d" points="14,88 19,83 41,83 46,88 41,93 19,93"/>
+                        <polygon class="seg e" points="12,54 17,59 17,81 12,86 7,81 7,59"/>
+                        <polygon class="seg f" points="12,14 17,19 17,41 12,46 7,41 7,19"/>
+                        <polygon class="seg g" points="14,50 19,45 41,45 46,50 41,55 19,55"/>
+                    </g>
+                    <text x="178" y="86" fill="#00ffcc" font-family="'Courier New', monospace" font-size="28" font-weight="bold" opacity="0.85">%</text>
+                    <text x="115" y="112" fill="#475569" font-size="8" font-weight="700" letter-spacing="1" text-anchor="middle">DIGITAL SENSOR LEVEL</text>
+                </svg>
+            </div>
+            <div class="stat-details">
+                <div>
+                    <div class="stat-item-lbl">Raw ADC</div>
+                    <div class="stat-item-val" id="raw-a">0</div>
+                </div>
+                <div>
+                    <div class="stat-item-lbl">Voltage</div>
+                    <div class="stat-item-val" id="volt-a">0.00 V</div>
+                </div>
+                <div>
+                    <div class="stat-item-lbl">Percentage</div>
+                    <div class="stat-item-val" id="pct-a" style="color: var(--green);">0.0%</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="widget-card">
+            <span class="card-tag">Channel B &bull; Simulated Tank</span>
+            <h3>Liquid Level Tank</h3>
+            <div style="padding: 5px 0;">
+                <svg width="190" height="140" viewBox="0 0 200 150">
+                    <defs>
+                        <linearGradient id="water-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+                            <stop offset="0%" stop-color="#00f2fe" stop-opacity="0.95"/>
+                            <stop offset="100%" stop-color="#2563eb" stop-opacity="0.8"/>
+                        </linearGradient>
+                        <clipPath id="tank-shape">
+                            <rect x="35" y="10" width="60" height="105" rx="14"/>
+                        </clipPath>
+                    </defs>
+                    <rect x="35" y="10" width="60" height="105" rx="14" fill="#090e1a" stroke="#172239" stroke-width="1.5"/>
+                    <g clip-path="url(#tank-shape)">
+                        <rect id="water-fill" x="35" y="115" width="60" height="0" fill="url(#water-grad)" filter="drop-shadow(0 0 6px #00f2fe)"/>
+                    </g>
+                    <rect x="35" y="10" width="60" height="105" rx="14" fill="none" stroke="#38bdf8" stroke-width="2" opacity="0.5"/>
+                    <rect x="40" y="16" width="4" height="90" rx="2" fill="#ffffff" opacity="0.15"/>
+                    <line x1="105" y1="12" x2="112" y2="12" stroke="#64748b" stroke-width="1.5"/>
+                    <text x="118" y="15" fill="#64748b" font-size="9">— 100%</text>
+                    <line x1="105" y1="38" x2="109" y2="38" stroke="#475569" stroke-width="1"/>
+                    <text x="118" y="41" fill="#475569" font-size="8">— 75%</text>
+                    <line x1="105" y1="63" x2="112" y2="63" stroke="#64748b" stroke-width="1.5"/>
+                    <text x="118" y="66" fill="#64748b" font-size="9">— 50%</text>
+                    <line x1="105" y1="89" x2="109" y2="89" stroke="#475569" stroke-width="1"/>
+                    <text x="118" y="92" fill="#475569" font-size="8">— 25%</text>
+                    <line x1="105" y1="114" x2="112" y2="114" stroke="#64748b" stroke-width="1.5"/>
+                    <text x="118" y="117" fill="#64748b" font-size="9">— 0%</text>
+                    <text id="tank-val" x="65" y="132" text-anchor="middle" fill="#38bdf8" font-size="14" font-weight="bold">0.0%</text>
+                    <text x="65" y="144" text-anchor="middle" fill="#475569" font-size="7" font-weight="700" letter-spacing="1">TANK LEVEL</text>
+                </svg>
+            </div>
+            <div class="stat-details">
+                <div>
+                    <div class="stat-item-lbl">Raw ADC</div>
+                    <div class="stat-item-val" id="raw-b">0</div>
+                </div>
+                <div>
+                    <div class="stat-item-lbl">Voltage</div>
+                    <div class="stat-item-val" id="volt-b">0.00 V</div>
+                </div>
+                <div>
+                    <div class="stat-item-lbl">Percentage</div>
+                    <div class="stat-item-val" id="pct-b">0.0%</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="status-footer">
+        <div>
+            <span class="live-dot"></span>
+            <span id="disp-source">Connecting to Gateway...</span>
+        </div>
+        <div id="disp-time">Last Update: -</div>
+    </div>
+
+    <script>
+        const SEGMENT_MAP = {
+            0: [1, 1, 1, 1, 1, 1, 0],
+            1: [0, 1, 1, 0, 0, 0, 0],
+            2: [1, 1, 0, 1, 1, 0, 1],
+            3: [1, 1, 1, 1, 0, 0, 1],
+            4: [0, 1, 1, 0, 0, 1, 1],
+            5: [1, 0, 1, 1, 0, 1, 1],
+            6: [1, 0, 1, 1, 1, 1, 1],
+            7: [1, 1, 1, 0, 0, 0, 0],
+            8: [1, 1, 1, 1, 1, 1, 1],
+            9: [1, 1, 1, 1, 0, 1, 1]
+        };
+        const SEG_NAMES = ['a', 'b', 'c', 'd', 'e', 'f', 'g'];
+
+        function setDigit(digitGroupId, num) {
+            const group = document.getElementById(digitGroupId);
+            if (!group) return;
+            const pattern = SEGMENT_MAP[num] || [0, 0, 0, 0, 0, 0, 0];
+            SEG_NAMES.forEach((segName, index) => {
+                const segElement = group.querySelector(`.${segName}`);
+                if (segElement) {
+                    if (pattern[index] === 1) {
+                        segElement.classList.add('active');
+                    } else {
+                        segElement.classList.remove('active');
+                    }
+                }
+            });
+        }
+
+        function update7Segment(percentage) {
+            const val = Math.min(99, Math.max(0, Math.round(percentage)));
+            setDigit('seg-digit1', Math.floor(val / 10));
+            setDigit('seg-digit2', val % 10);
+        }
+
+        function updateTankLevel(percentage) {
+            const maxHeight = 105;
+            const tankBottomY = 115;
+            const clampedPct = Math.min(100, Math.max(0, percentage));
+            const fillHeight = (clampedPct / 100.0) * maxHeight;
+            const fillY = tankBottomY - fillHeight;
+
+            const water = document.getElementById('water-fill');
+            if (water) {
+                water.setAttribute('height', fillHeight);
+                water.setAttribute('y', fillY);
+            }
+            const tankText = document.getElementById('tank-val');
+            if (tankText) {
+                tankText.textContent = clampedPct.toFixed(1) + '%';
+            }
+        }
+
+        async function pollTelemetry() {
+            try {
+                const res = await fetch('/api/telemetry');
+                if (!res.ok) return;
+                const data = await res.json();
+
+                update7Segment(data.channelA.percentage);
+                document.getElementById('raw-a').textContent = data.channelA.rawValue;
+                document.getElementById('volt-a').textContent = data.channelA.voltage.toFixed(2) + ' V';
+                document.getElementById('pct-a').textContent = data.channelA.percentage.toFixed(1) + '%';
+
+                updateTankLevel(data.channelB.percentage);
+                document.getElementById('raw-b').textContent = data.channelB.rawValue;
+                document.getElementById('volt-b').textContent = data.channelB.voltage.toFixed(2) + ' V';
+                document.getElementById('pct-b').textContent = data.channelB.percentage.toFixed(1) + '%';
+
+                
+                document.getElementById('disp-source').textContent = '📡 ' + data.dataSource;
+                document.getElementById('disp-time').textContent = 'อัปเดตล่าสุด: ' + new Date(data.lastUpdated).toLocaleTimeString();
+
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        setInterval(pollTelemetry, 150);
+    </script>
+</body>
+</html>
