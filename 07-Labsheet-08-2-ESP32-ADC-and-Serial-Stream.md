@@ -207,3 +207,4 @@ python -m esptool -p COM24 --chip esp32 -b 460800 --before default_reset --after
 
 - บันทึกภาพถ่ายการต่อวงจรและภาพหน้าจอ Monitor ลงในรายงานผลการทดลอง
 - 
+![Uploading image.png…]()
