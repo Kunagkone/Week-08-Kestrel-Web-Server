@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ESP32 IoT Interactive Gateway Dashboard</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background: radial-gradient(circle at center, #1b263b 0%, #0d1b2a 100%);
+            color: #e0e1dd;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 24px;
+            padding: 30px;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+            text-align: center;
+            max-width: 480px;
+            width: 100%;
+        }
+        h1 { font-size: 1.5rem; color: #00f2fe; margin-bottom: 5px; }
+        .subtitle { font-size: 0.85rem; color: #778da9; margin-bottom: 20px; }
+        .gauge-svg { width: 100%; max-width: 300px; filter: drop-shadow(0 0 15px rgba(0, 242, 254, 0.2)); }
+        #needle { transform-origin: 150px 150px; transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1); }
+        .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 20px; }
+        .stat-card { background: rgba(13, 27, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 12px; }
+        .stat-label { font-size: 0.75rem; color: #778da9; text-transform: uppercase; }
+        .stat-val { font-size: 1.3rem; font-weight: bold; color: #4cc9f0; margin-top: 4px; }
+        .source-badge { display: inline-block; margin-top: 15px; padding: 6px 14px; border-radius: 20px; font-size: 0.75rem; background: rgba(0, 242, 254, 0.1); color: #00f2fe; border: 1px solid rgba(0, 242, 254, 0.3); }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>🏎️ IoT Edge Speedometer</h1>
+    <div class="subtitle">ESP32 Hardware Stream &bull; Kestrel Edge Web Server</div>
+
+    <svg class="gauge-svg" viewBox="0 0 300 200">
+        <path d="M 40 150 A 110 110 0 0 1 260 150" fill="none" stroke="#2a3b5c" stroke-width="18" stroke-linecap="round"/>
+        <path d="M 40 150 A 110 110 0 0 1 150 40" fill="none" stroke="#4ade80" stroke-width="6" stroke-linecap="round"/>
+        <path d="M 150 40 A 110 110 0 0 1 215 65" fill="none" stroke="#facc15" stroke-width="6"/>
+        <path d="M 215 65 A 110 110 0 0 1 260 150" fill="none" stroke="#ef4444" stroke-width="6" stroke-linecap="round"/>
+
+        <text x="35" y="175" fill="#778da9" font-size="12" text-anchor="middle">0%</text>
+        <text x="150" y="25" fill="#778da9" font-size="12" text-anchor="middle">50%</text>
+        <text x="265" y="175" fill="#778da9" font-size="12" text-anchor="middle">100%</text>
+
+        <text id="disp-percent" x="150" y="135" fill="#ffffff" font-size="32" font-weight="bold" text-anchor="middle">0.0%</text>
+
+        <g id="needle" style="transform: rotate(-90deg);">
+            <polygon points="147,150 153,150 151,50 149,50" fill="#ff0055" filter="drop-shadow(0 0 6px #ff0055)"/>
+            <circle cx="150" cy="150" r="10" fill="#ffffff"/>
+            <circle cx="150" cy="150" r="5" fill="#ff0055"/>
+        </g>
+    </svg>
+
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-label">ADC 12-Bit Raw</div>
+            <div class="stat-val" id="disp-raw">0</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Sensor Voltage</div>
+            <div class="stat-val" id="disp-volt">0.00 V</div>
+        </div>
+    </div>
+
+    <div class="source-badge" id="disp-source">Connecting...</div>
+</div>
+
+<script>
+    function percentToAngle(pct) {
+        return (pct / 100.0) * 180.0 - 90.0;
+    }
+
+    async function pollTelemetry() {
+        try {
+            const res = await fetch('/api/telemetry');
+            if (!res.ok) return;
+            const data = await res.json();
+
+            document.getElementById('disp-percent').textContent = data.percentage.toFixed(1) + '%';
+            document.getElementById('disp-raw').textContent = data.rawValue;
+            document.getElementById('disp-volt').textContent = data.voltage.toFixed(2) + ' V';
+            document.getElementById('disp-source').textContent = '📡 ' + data.dataSource;
+
+            const angle = percentToAngle(data.percentage);
+            document.getElementById('needle').style.transform = `rotate(${angle}deg)`;
+        } catch (err) {
+            console.error('Polling error:', err);
+        }
+    }
+
+    setInterval(pollTelemetry, 150);
+</script>
+
+</body>
+</html>
