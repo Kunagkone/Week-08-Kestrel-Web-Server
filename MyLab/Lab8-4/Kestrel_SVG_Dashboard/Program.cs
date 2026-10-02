@@ -73,7 +73,7 @@ public class SerialPortWorker : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        // ⚠️ เปลี่ยน COM Port ให้ตรงกับที่ ESP32 เชื่อมต่ออยู่ (เช่น "COM3", "COM4" หรือ "/dev/ttyUSB0")
+        // ⚠️ เปลี่ยน COM Port ให้ตรงกับพอร์ตของ ESP32 (เช่น "COM3", "COM4")
         string portName = "COM3"; 
 
         while (!stoppingToken.IsCancellationRequested)
@@ -81,20 +81,35 @@ public class SerialPortWorker : BackgroundService
             try
             {
                 using var serialPort = new SerialPort(portName, 115200);
+
+                // 💡 [แก้จุดที่ 1]: เปิดสัญญาณ DTR/RTS เพื่อให้ชิป USB-Serial บน ESP32 ส่งข้อมูลออกมาได้
+                serialPort.DtrEnable = true;
+                serialPort.RtsEnable = true;
+
+                // 💡 [แก้จุดที่ 2]: กำหนด ReadTimeout กันไม่ให้โปรแกรมค้างเวลาอ่านข้อมูล
+                serialPort.ReadTimeout = 1000;
+
                 serialPort.Open();
                 _logger.LogInformation($"เชื่อมต่อ Serial Port {portName} สำเร็จ");
 
                 while (!stoppingToken.IsCancellationRequested && serialPort.IsOpen)
                 {
-                    if (serialPort.BytesToRead > 0)
+                    try
                     {
+                        // 💡 [แก้จุดที่ 3]: อ่านข้อมูลเป็นบรรทัดตรงๆ
                         string line = serialPort.ReadLine().Trim();
+
                         if (int.TryParse(line, out int rawVal))
                         {
                             _store.Update(rawVal);
                         }
                     }
-                    await Task.Delay(30, stoppingToken);
+                    catch (TimeoutException)
+                    {
+                        // หากช่วงเวลานั้นไม่มีข้อมูลส่งมา ให้ข้ามรอบไป ไม่ให้โปรแกรมแครช
+                    }
+
+                    await Task.Yield(); // คืนระบบให้ Process อื่นทำงานได้อย่างราบรื่น
                 }
             }
             catch (Exception ex)
