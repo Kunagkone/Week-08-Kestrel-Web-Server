@@ -1,5 +1,6 @@
 using System.IO.Ports;
 using System.Text.Json.Serialization;
+using System.Text.RegularExpressions;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -9,15 +10,17 @@ builder.Services.AddHostedService<SerialPortWorker>();
 
 var app = builder.Build();
 
-// เสิร์ฟไฟล์ static (index.html) จาก wwwroot อัตโนมัติ
+// เปิดใช้งาน Static File Server (เสิร์ฟ index.html ใน wwwroot อัตโนมัติ)[cite: 1]
 app.UseFileServer();
 
-// API Endpoint สำหรับให้ Web Frontend ดึงข้อมูลไปแสดงผล
+// API Endpoint สำหรับ Web Frontend ดึงข้อมูลไปแสดงผลแบบ Polling[cite: 1]
 app.MapGet("/api/telemetry", (TelemetryStore store) => Results.Ok(store.GetLatest()));
 
 app.Run();
 
-// โมเดลข้อมูล
+// ----------------------------------------------------
+// โมเดลข้อมูล Telemetry[cite: 1]
+// ----------------------------------------------------
 public class TelemetryData
 {
     [JsonPropertyName("rawValue")]
@@ -30,10 +33,12 @@ public class TelemetryData
     public double Percentage { get; set; }
 
     [JsonPropertyName("dataSource")]
-    public string DataSource { get; set; } = "ESP32 (Simulated Stream)";
+    public string DataSource { get; set; } = "ESP32 Waiting for Data...";
 }
 
-// คลาสเก็บสถานะข้อมูลล่าสุด
+// ----------------------------------------------------
+// คลาสเก็บและเข้าถึงสถานะข้อมูลล่าสุดแบบ Thread-Safe
+// ----------------------------------------------------
 public class TelemetryStore
 {
     private TelemetryData _data = new();
@@ -41,29 +46,41 @@ public class TelemetryStore
 
     public TelemetryData GetLatest()
     {
-        lock (_lock) { return _data; }
+        lock (_lock)
+        {
+            return _data;
+        }
     }
 
-    public void Update(int raw)
+    public void Update(int raw, string source = "ESP32 USB Serial")
     {
+        // บังคับจำกัดค่าให้อยู่ในสเกล ADC 12-Bit (0 - 4095)
+        int clampedRaw = Math.Clamp(raw, 0, 4095);
+
         lock (_lock)
         {
             _data = new TelemetryData
             {
-                RawValue = raw,
-                Voltage = Math.Round(raw * 3.3 / 4095.0, 2),
-                Percentage = Math.Round((raw / 4095.0) * 100.0, 1),
-                DataSource = "ESP32 USB Serial (Simulated)"
+                RawValue = clampedRaw,
+                Voltage = Math.Round(clampedRaw * 3.3 / 4095.0, 2),
+                Percentage = Math.Round((clampedRaw / 4095.0) * 100.0, 1),
+                DataSource = source
             };
         }
     }
 }
 
-// Background Worker ทำหน้าที่อ่าน Serial Port
+// ----------------------------------------------------
+// Background Worker สำหรับอ่านข้อมูลจาก Serial Port
+// ----------------------------------------------------
 public class SerialPortWorker : BackgroundService
 {
     private readonly TelemetryStore _store;
     private readonly ILogger<SerialPortWorker> _logger;
+
+    // ⚠️ ระบุ COM Port ของ ESP32 (ปรับเปลี่ยนเลข COM ตรงนี้ถ้าบอร์ดของคุณอยู่อย่างเช่น COM4, COM5)
+    private const string TargetPortName = "COM3";
+    private const int BaudRate = 115200;
 
     public SerialPortWorker(TelemetryStore store, ILogger<SerialPortWorker> logger)
     {
@@ -73,49 +90,62 @@ public class SerialPortWorker : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        // ⚠️ เปลี่ยน COM Port ให้ตรงกับพอร์ตของ ESP32 (เช่น "COM3", "COM4")
-        string portName = "COM3"; 
+        // 🔍 แสดงรายชื่อ COM Port ทั้งหมดที่มีอยู่ในคอมพิวเตอร์ขณะนั้นลง Terminal
+        string[] availablePorts = SerialPort.GetPortNames();
+        _logger.LogInformation($"[Serial Check] COM Port ที่พบในเครื่องขณะนี้: [{string.Join(", ", availablePorts)}]");
 
         while (!stoppingToken.IsCancellationRequested)
         {
             try
             {
-                using var serialPort = new SerialPort(portName, 115200);
-
-                // 💡 [แก้จุดที่ 1]: เปิดสัญญาณ DTR/RTS เพื่อให้ชิป USB-Serial บน ESP32 ส่งข้อมูลออกมาได้
-                serialPort.DtrEnable = true;
-                serialPort.RtsEnable = true;
-
-                // 💡 [แก้จุดที่ 2]: กำหนด ReadTimeout กันไม่ให้โปรแกรมค้างเวลาอ่านข้อมูล
-                serialPort.ReadTimeout = 1000;
+                using var serialPort = new SerialPort(TargetPortName, BaudRate)
+                {
+                    DtrEnable = true,   // จำเป็นมากสำหรับชิป ESP32 เพื่อเริ่มส่งข้อมูล
+                    RtsEnable = true,   // สัญญาณควบคุมการส่งข้อมูล
+                    ReadTimeout = 1000, // กันคำสั่ง ReadLine ค้างค้างคืน
+                    NewLine = "\n"      // กำหนดสัญลักษณ์จบบรรทัด
+                };
 
                 serialPort.Open();
-                _logger.LogInformation($"เชื่อมต่อ Serial Port {portName} สำเร็จ");
+                _logger.LogInformation($"✅ เชื่อมต่อ Serial Port {TargetPortName} (Baud Rate: {BaudRate}) สำเร็จ!");
 
                 while (!stoppingToken.IsCancellationRequested && serialPort.IsOpen)
                 {
                     try
                     {
-                        // 💡 [แก้จุดที่ 3]: อ่านข้อมูลเป็นบรรทัดตรงๆ
-                        string line = serialPort.ReadLine().Trim();
+                        string rawLine = serialPort.ReadLine().Trim();
 
-                        if (int.TryParse(line, out int rawVal))
+                        if (string.IsNullOrWhiteSpace(rawLine))
                         {
-                            _store.Update(rawVal);
+                            continue;
+                        }
+
+                        // 💡 พิมพ์ข้อมูลที่อ่านได้สดๆ ออกทาง Terminal เพื่อตรวจเช็ค
+                        _logger.LogInformation($"[Serial Receive]: {rawLine}");
+
+                        // ใช้ Regex สกัดเฉพาะกลุ่มตัวเลขออกมา (กรองขยะหรือข้อความตัวอักษรออกให้อัตโนมัติ)
+                        var match = Regex.Match(rawLine, @"\d+");
+                        if (match.Success && int.TryParse(match.Value, out int rawVal))
+                        {
+                            _store.Update(rawVal, $"ESP32 USB Serial ({TargetPortName})");
+                        }
+                        else
+                        {
+                            _logger.LogWarning($"[Parse Warning] อ่านข้อความได้ แต่แปลงเป็นตัวเลขไม่ได้: '{rawLine}'");
                         }
                     }
                     catch (TimeoutException)
                     {
-                        // หากช่วงเวลานั้นไม่มีข้อมูลส่งมา ให้ข้ามรอบไป ไม่ให้โปรแกรมแครช
+                        // กรณีไม่มีข้อมูลส่งมาจาก ESP32 ภายใน 1 วินาที ให้ข้ามไปรอบถัดไป
                     }
 
-                    await Task.Yield(); // คืนระบบให้ Process อื่นทำงานได้อย่างราบรื่น
+                    await Task.Yield();
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogWarning($"กำลังรอการเชื่อมต่อ Serial ({portName}): {ex.Message}");
-                await Task.Delay(2000, stoppingToken); // ลองใหม่ทุก 2 วินาที
+                _logger.LogWarning($"⚠️ ไม่สามารถเปิดพอร์ต {TargetPortName} ได้ ({ex.Message}) กำลังลองใหม่ใน 2 วินาที...");
+                await Task.Delay(2000, stoppingToken);
             }
         }
     }
