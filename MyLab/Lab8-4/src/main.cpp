@@ -1,7 +1,7 @@
 #include <Arduino.h>
 
 int simulatedAdc = 0;
-int stepAmount = 1; // 💡 ปรับลดเหลือ 10 (ยิ่งน้อย ยิ่งเคลื่อนที่ช้าและนุ่มนวล)
+int stepAmount = 10; // 💡 ปรับลดเหลือ 10 (ยิ่งน้อย ยิ่งเคลื่อนที่ช้าและนุ่มนวล)
 
 void setup() {
     Serial.begin(115200);
