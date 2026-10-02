@@ -1,26 +1,25 @@
 #include <Arduino.h>
-#include <math.h>
 
-float angle = 0.0;
+int simulatedAdc = 0;
+int stepAmount = 1; // 💡 ปรับลดเหลือ 10 (ยิ่งน้อย ยิ่งเคลื่อนที่ช้าและนุ่มนวล)
 
 void setup() {
-    // เริ่มต้น Serial Communication ที่ Baud rate 115200
     Serial.begin(115200);
 }
 
 void loop() {
-    // จำลองค่า ADC (12-bit: 0 - 4095) ด้วยฟังก์ชัน Sine Wave
-    // ค่าจะค่อยๆ กวาดขึ้นจาก 0 ไปถึง 4095 แล้วกวาดลงอย่างนุ่มนวล
-    int simulatedAdc = (int)((sin(angle) + 1.0) * 2047.5);
+    simulatedAdc += stepAmount;
 
-    // ส่งค่าไปยัง คอมพิวเตอร์ผ่าน USB Serial
-    Serial.println(simulatedAdc);
-
-    // เพิ่มมุมเพื่อเปลี่ยนค่าคลื่น
-    angle += 0.05;
-    if (angle >= 3.14159 * 2) {
-        angle = 0.0;
+    if (simulatedAdc >= 4095) {
+        simulatedAdc = 4095;
+        stepAmount = -stepAmount; 
+    } 
+    else if (simulatedAdc <= 0) {
+        simulatedAdc = 0;
+        stepAmount = -stepAmount; 
     }
 
-    delay(50); // ส่งข้อมูลทุกๆ 50ms
+    Serial.println(simulatedAdc);
+
+    delay(50); // 💡 ส่งข้อมูลทุกๆ 50ms
 }
